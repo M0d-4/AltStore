@@ -197,6 +197,7 @@ private extension AppIDsViewController
         {
             self.collectionView.refreshControl?.endRefreshing()
             self.activityIndicatorBarButtonItem.isIndicatingActivity = false
+            self.activityIndicatorBarButtonItem.isHidden = true
         }
     }
 }
