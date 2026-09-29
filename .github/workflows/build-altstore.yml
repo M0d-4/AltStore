@@ -68,9 +68,10 @@ jobs:
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME"
 
-      - name: Build (unsigned, for device)
+      - name: Build and package unsigned .ipa
         run: |
-          set -o pipefail
+          set -eo pipefail
+
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -84,11 +85,9 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             ONLY_ACTIVE_ARCH=NO \
             clean build \
-            | xcpretty --color || xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -sdk iphoneos -destination "generic/platform=iOS" -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" AD_HOC_CODE_SIGNING_ALLOWED=YES ONLY_ACTIVE_ARCH=NO clean build
+            | tee xcodebuild.log \
+            | (xcpretty --color || cat)
 
-      - name: Package unsigned .ipa
-        run: |
-          set -e
           APP_PATH=$(find "$DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos" -maxdepth 1 -name "*.app" | head -n1)
           if [ -z "$APP_PATH" ]; then
             echo "No .app product found under $DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos" >&2
@@ -99,6 +98,15 @@ jobs:
           cp -R "$APP_PATH" Payload/
           zip -r -y "AltStore-unsigned.ipa" Payload
           rm -rf Payload
+
+      - name: Upload full build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
