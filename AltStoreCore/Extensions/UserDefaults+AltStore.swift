@@ -82,6 +82,7 @@ public extension UserDefaults
 
     @NSManaged var preferredAnisetteServerURL: URL?
     @NSManaged var ignoresBundledPairingFile: Bool
+    @NSManaged var adoptedBundledPairingFileHash: String?
     
     // Only true when a pairing file is configured, so this alone decides if we should use local vs. remote AltServer.
     @NSManaged var prefersRemoteAltServer: Bool
