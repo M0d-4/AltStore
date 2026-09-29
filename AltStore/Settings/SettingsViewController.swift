@@ -257,19 +257,19 @@ private extension SettingsViewController
         self.disableResponseCachingSwitch.isOn = UserDefaults.standard.responseCachingDisabled
         self.prefersRemoteAltServerSwitch.isOn = UserDefaults.shared.prefersRemoteAltServer
         
-        self.isRemoteAltServerConfigured = (Keychain.shared.devicePairingFile != nil)
+        self.isRemoteAltServerConfigured = PairingFileManager.shared.refresh().isPresent
         
         if self.isRemoteAltServerConfigured
         {
             let preferredURL = UserDefaults.shared.preferredAnisetteServerURL
             let serverName = UserDefaults.shared.anisetteServers?.first { $0.url == preferredURL }?.name
             
-            self.remoteAltServerLabel.text = String(localized: "Server")
-            self.serverURLLabel.text = serverName ?? preferredURL?.host ?? String(localized: "None")
+            self.remoteAltServerLabel.text = String(localized: "Pairing File")
+            self.serverURLLabel.text = String(localized: "Detected")
         }
         else
         {
-            self.remoteAltServerLabel.text = String(localized: "Set up Remote AltServer…")
+            self.remoteAltServerLabel.text = String(localized: "Add Pairing File…")
             self.serverURLLabel.text = nil
         }
         
@@ -354,7 +354,7 @@ private extension SettingsViewController
         case .remoteAltServer:
             if isHeader
             {
-                settingsHeaderFooterView.primaryLabel.text = NSLocalizedString("REMOTE ALTSERVER", comment: "")
+                settingsHeaderFooterView.primaryLabel.text = NSLocalizedString("PAIRING FILE", comment: "")
 
                 settingsHeaderFooterView.button.setTitle(NSLocalizedString("LEARN MORE", comment: ""), for: .normal)
                 settingsHeaderFooterView.button.addTarget(self, action: #selector(SettingsViewController.openRemoteAltServerLearnMore(_:)), for: .primaryActionTriggered)
@@ -363,8 +363,8 @@ private extension SettingsViewController
             else
             {
                 settingsHeaderFooterView.secondaryLabel.text = self.isRemoteAltServerConfigured
-                    ? NSLocalizedString("When enabled, AltStore will sideload apps using a remote AltServer instead of a computer.", comment: "")
-                    : NSLocalizedString("Set up Remote AltServer to sideload apps without a computer.", comment: "")
+                    ? NSLocalizedString("When enabled, AltStore will sideload apps on this device using the pairing file instead of AltServer on a computer.", comment: "")
+                    : NSLocalizedString("Add a pairing file (from iloader or a .plist) to sideload apps without a computer.", comment: "")
             }
             
         case .techyThings:
@@ -612,55 +612,40 @@ private extension SettingsViewController
     
     func showRemoteAltServer()
     {
-        let hostingController = RemoteAltServerView.makeViewController()
-        self.navigationController?.pushViewController(hostingController, animated: true)
-
-        if let selectedIndexPath = self.tableView.indexPathForSelectedRow
-        {
-            self.tableView.deselectRow(at: selectedIndexPath, animated: true)
-        }
+        self.showPairingFile()
     }
 
     func setUpRemoteAltServer()
     {
-        if #unavailable(iOS 27)
-        {
-            // The setup requires sign-in: pairing needs an account, and the bundled pairing file can't be decrypted without one.
-            guard self.activeTeam != nil else { return self.signIn { result in
-                if case .success = result { self.setUpRemoteAltServer() }
-            } }
+        self.showPairingFile()
+    }
+
+    func showPairingFile()
+    {
+        let viewController = PairingFileViewController()
+        viewController.changeHandler = { [weak self] in
+            if PairingFileManager.shared.refresh().isPresent
+            {
+                // Selects a default server and provisions adi.pb against it
+                AppManager.shared.fetchAnisetteData { result in
+                    if case .failure(let error) = result
+                    {
+                        Logger.sideload.error("Failed to fetch anisette data when selecting a default server. \(error.localizedDescription, privacy: .public)")
+                    }
+                    
+                    DispatchQueue.main.async { self?.update() }
+                }
+            }
+            
+            self?.update()
         }
         
-        if Keychain.shared.devicePairingFile == nil,
-           !UserDefaults.shared.ignoresBundledPairingFile,
-           let pairingFile = AppManager.shared.bundledPairingFile()
-        {
-            Keychain.shared.devicePairingFile = pairingFile // Promote bundled pairing file on first setup only.
-        }
+        self.navigationController?.pushViewController(viewController, animated: true)
         
         if let selectedIndexPath = self.tableView.indexPathForSelectedRow
         {
             self.tableView.deselectRow(at: selectedIndexPath, animated: true)
         }
-        
-        let hostingController = RemoteAltServerSetupView.makeViewController {
-            UserDefaults.shared.prefersRemoteAltServer = true
-            
-            // Selects a default server and provisions adi.pb against it
-            AppManager.shared.fetchAnisetteData { result in
-                if case .failure(let error) = result
-                {
-                    Logger.sideload.error("Failed to fetch anisette data when selecting a default server. \(error.localizedDescription, privacy: .public)")
-                }
-                
-                DispatchQueue.main.async { self.update() }
-            }
-            
-            self.update()
-            self.dismiss(animated: true)
-        }
-        
-        self.present(hostingController, animated: true)
     }
 
     @IBAction func handleDebugModeGesture(_ gestureRecognizer: UISwipeGestureRecognizer)

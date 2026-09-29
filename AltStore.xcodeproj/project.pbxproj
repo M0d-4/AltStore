@@ -512,6 +512,11 @@
 		D5FD4EC52A952EAD0097BEE8 /* AltWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FD4EC42A952EAD0097BEE8 /* AltWidgetBundle.swift */; };
 		D5FD4EC92A9530C00097BEE8 /* AppSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FD4EC82A9530C00097BEE8 /* AppSnapshot.swift */; };
 		D5FD4ECB2A9532960097BEE8 /* DatabaseManager+Async.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5FD4ECA2A9532960097BEE8 /* DatabaseManager+Async.swift */; };
+		1E595E0BE248F4DF6962A364 /* PairingFileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D408D6A1A597F45B074CC4 /* PairingFileManager.swift */; };
+		A298529EE45DF0F2A8BD0AD1 /* IgnoredUpdatesManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C8AE808AC643012F58B370 /* IgnoredUpdatesManager.swift */; };
+		6AF61AECFC9BDC09449553D5 /* AppExtensionSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA629ED0C991BAF0F7D07363 /* AppExtensionSelection.swift */; };
+		7584289469AB0E300FB3813C /* PairingFileViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DFE7F7DD3F002D804F51579 /* PairingFileViewController.swift */; };
+		DEC8145F4BE176931520A532 /* UpdatesViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4A367C980EB6560FEF3280 /* UpdatesViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1353,6 +1358,11 @@
 		D5FD4ECA2A9532960097BEE8 /* DatabaseManager+Async.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseManager+Async.swift"; sourceTree = "<group>"; };
 		EA79A60285C6AF5848AA16E9 /* Pods-AltStore.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltStore.debug.xcconfig"; path = "Target Support Files/Pods-AltStore/Pods-AltStore.debug.xcconfig"; sourceTree = "<group>"; };
 		FC3822AB1C4CF1D4CDF7445D /* Pods_AltServer.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_AltServer.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D6D408D6A1A597F45B074CC4 /* PairingFileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingFileManager.swift; sourceTree = "<group>"; };
+		48C8AE808AC643012F58B370 /* IgnoredUpdatesManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IgnoredUpdatesManager.swift; sourceTree = "<group>"; };
+		DA629ED0C991BAF0F7D07363 /* AppExtensionSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppExtensionSelection.swift; sourceTree = "<group>"; };
+		4DFE7F7DD3F002D804F51579 /* PairingFileViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingFileViewController.swift; sourceTree = "<group>"; };
+		FE4A367C980EB6560FEF3280 /* UpdatesViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2146,6 +2156,7 @@
 				BFDB69FB22A9A7A6007EA6D6 /* Settings */,
 				BFD2478A2284C49000981D42 /* Managing Apps */,
 				BFC84A4B2421A13000853474 /* Sources */,
+				DC5FDF2B7E91AEB4ED8BCB8B /* Updates */,
 				BF56D2AD23DF9E170006506D /* App IDs */,
 				D5BDD9712B1FC8FA001F84DE /* Permissions */,
 				BFC51D7922972F1F00388324 /* Server */,
@@ -2184,6 +2195,9 @@
 		BFD2478A2284C49000981D42 /* Managing Apps */ = {
 			isa = PBXGroup;
 			children = (
+				D6D408D6A1A597F45B074CC4 /* PairingFileManager.swift */,
+				48C8AE808AC643012F58B370 /* IgnoredUpdatesManager.swift */,
+				DA629ED0C991BAF0F7D07363 /* AppExtensionSelection.swift */,
 				BF0C4EBC22A1BD8B009A2DD7 /* AppManager.swift */,
 				BF88F97124F8727D00BB75DF /* AppManagerErrors.swift */,
 				D5399FAD2BE56B030038DDEF /* JoinPatreonViewController.swift */,
@@ -2278,6 +2292,7 @@
 		BFDB69FB22A9A7A6007EA6D6 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				4DFE7F7DD3F002D804F51579 /* PairingFileViewController.swift */,
 				BFE60737231ADF49002B0E8E /* Settings.storyboard */,
 				BFE60739231ADF82002B0E8E /* SettingsViewController.swift */,
 				82AB00032FC0345000567241 /* RemoteAltServerView.swift */,
@@ -2644,6 +2659,14 @@
 				D5FB7A202AA284ED00EF863D /* Task+Timeout.swift */,
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		DC5FDF2B7E91AEB4ED8BCB8B /* Updates */ = {
+			isa = PBXGroup;
+			children = (
+				FE4A367C980EB6560FEF3280 /* UpdatesViewController.swift */,
+			);
+			path = Updates;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -3705,6 +3728,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1E595E0BE248F4DF6962A364 /* PairingFileManager.swift in Sources */,
+				A298529EE45DF0F2A8BD0AD1 /* IgnoredUpdatesManager.swift in Sources */,
+				6AF61AECFC9BDC09449553D5 /* AppExtensionSelection.swift in Sources */,
+				7584289469AB0E300FB3813C /* PairingFileViewController.swift in Sources */,
+				DEC8145F4BE176931520A532 /* UpdatesViewController.swift in Sources */,
 				BFDB6A0F22AB2776007EA6D6 /* SendAppOperation.swift in Sources */,
 				BFDB6A0D22AAFC1A007EA6D6 /* OperationError.swift in Sources */,
 				BF74989B23621C0700CED65F /* ForwardingNavigationController.swift in Sources */,
@@ -4605,7 +4633,7 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "AltStore/AltStore-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -4643,7 +4671,7 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "AltStore/AltStore-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};

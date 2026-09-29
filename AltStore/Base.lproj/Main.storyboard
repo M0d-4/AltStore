@@ -39,7 +39,6 @@
                         <segue destination="kjR-gi-fgT" kind="relationship" relationship="viewControllers" id="eWy-uk-nwG"/>
                         <segue destination="bTL-bY-9Yq" kind="presentation" identifier="finishJailbreak" id="cIc-Ta-uNk"/>
                         <segue destination="HCK-G6-KdY" kind="relationship" relationship="viewControllers" id="X0t-T6-JeA"/>
-                        <segue destination="faz-B4-Sub" kind="relationship" relationship="viewControllers" id="OLu-kM-z1J"/>
                         <segue destination="3Ew-ox-i4n" kind="relationship" relationship="viewControllers" id="phQ-Pc-pqw"/>
                         <segue destination="p3d-dP-Swg" kind="relationship" relationship="viewControllers" id="cQE-Az-fdo"/>
                     </connections>

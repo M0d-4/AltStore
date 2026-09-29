@@ -403,7 +403,7 @@ struct OnDeviceError: ALTLocalizedError
     var recoverySuggestion: String? {
         switch self.code
         {
-        case .invalidPairingFile, .pairingNotTrusted: return String(localized: "Reset remote AltServer in AltStore’s settings, then set it up again.")
+        case .invalidPairingFile, .pairingNotTrusted: return String(localized: "Delete the pairing file in AltStore’s settings, then add a new one.")
         case .connectionFailed: return String(localized: "Make sure Wi-Fi and LocalDevVPN are both connected, then try again.")
         case .serviceFailed: return String(localized: "Please try again.")
         }

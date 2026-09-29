@@ -15,7 +15,7 @@ extension TabBarController
     {
         case news
         case sources
-        case browse
+        case updates   // Added in code; Browse was merged into Sources.
         case myApps
         case settings
     }
@@ -28,7 +28,7 @@ class TabBarController: UITabBarController
     private var _viewDidAppear = false
     
     private var sourcesViewController: SourcesViewController!
-    private var featuredViewController: FeaturedViewController!
+    private var updatesViewController: UpdatesViewController!
     
     required init?(coder aDecoder: NSCoder)
     {
@@ -38,7 +38,7 @@ class TabBarController: UITabBarController
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.importApp(_:)), name: AppDelegate.importAppDeepLinkNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.presentSources(_:)), name: AppDelegate.addSourceDeepLinkNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.openErrorLog(_:)), name: ToastView.openErrorLogNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.openBrowseTab(_:)), name: AppDelegate.searchDeepLinkNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.openBrowseTab(_:)), name: AppDelegate.searchDeepLinkNotification, object: nil) // Search now lives in the Sources tab.
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.viewApp(_:)), name: AppDelegate.viewAppDeepLinkNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(TabBarController.exportCertificate(_:)), name: AppDelegate.exportCertificateDeepLinkNotification, object: nil)
     }
@@ -47,12 +47,46 @@ class TabBarController: UITabBarController
     {
         super.viewDidLoad()
         
-        let browseNavigationController = self.viewControllers![Tab.browse.rawValue] as! UINavigationController
-        browseNavigationController.tabBarItem.image = UIImage(systemName: "bag")
-        self.featuredViewController = browseNavigationController.viewControllers.first as? FeaturedViewController
+        // Updates tab is created in code, right after Sources.
+        let updatesViewController = UpdatesViewController()
+        let updatesNavigationController = ForwardingNavigationController(rootViewController: updatesViewController)
+        updatesNavigationController.navigationBar.prefersLargeTitles = true
+        updatesNavigationController.tabBarItem = UITabBarItem(title: NSLocalizedString("Updates", comment: ""), image: UIImage(systemName: "arrow.down.circle"), selectedImage: UIImage(systemName: "arrow.down.circle.fill"))
+        updatesNavigationController.tabBarItem.badgeColor = .altPrimary
+        self.updatesViewController = updatesViewController
+        
+        var controllers = self.viewControllers ?? []
+        controllers.insert(updatesNavigationController, at: min(Tab.updates.rawValue, controllers.count))
+        self.setViewControllers(controllers, animated: false)
+        
+        // Load now so the Updates badge is correct before the tab is ever opened.
+        updatesViewController.loadViewIfNeeded()
         
         let sourcesNavigationController = self.viewControllers![Tab.sources.rawValue] as! UINavigationController
         self.sourcesViewController = sourcesNavigationController.viewControllers.first as? SourcesViewController
+        
+        if UIDevice.current.userInterfaceIdiom == .pad, #available(iOS 18, *)
+        {
+            // Native iPad navigation: tabs become a sidebar tiled beside the content. iPhone keeps the bottom tab bar.
+            self.mode = .tabSidebar
+            self.sidebar.isHidden = false
+        }
+    }
+    
+    /// Selects a tab. With the iPad sidebar active, tabs must be looked up by identity, not index.
+    private func select(_ tab: Tab)
+    {
+        guard let viewControllers = self.viewControllers, viewControllers.indices.contains(tab.rawValue) else { return }
+        let viewController = viewControllers[tab.rawValue]
+        
+        if #available(iOS 18, *), let uiTab = self.tabs.first(where: { $0.viewController === viewController })
+        {
+            self.selectedTab = uiTab
+        }
+        else
+        {
+            self.selectedIndex = tab.rawValue
+        }
     }
     
     override func viewDidAppear(_ animated: Bool)
@@ -74,6 +108,23 @@ class TabBarController: UITabBarController
             
             self.performSegue(withIdentifier: "finishJailbreak", sender: patchedApp)
         }
+        
+        self.promptForPairingFileIfNeeded()
+    }
+    
+    /// First launch without a pairing file: bring up the Pairing File screen (instead of the old “Connect to AltServer” setup).
+    private func promptForPairingFileIfNeeded()
+    {
+        guard self.presentedViewController == nil else { return }
+        guard !PairingFileManager.shared.refresh().isPresent else { return }
+        guard !UserDefaults.standard.bool(forKey: "didPromptForPairingFile") else { return }
+        
+        UserDefaults.standard.set(true, forKey: "didPromptForPairingFile")
+        
+        let pairingViewController = PairingFileViewController()
+        let navigationController = UINavigationController(rootViewController: pairingViewController)
+        navigationController.modalPresentationStyle = .formSheet
+        self.present(navigationController, animated: true)
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?)
@@ -127,7 +178,7 @@ extension TabBarController
             self.sourcesViewController?.deepLinkSourceURL = sourceURL
         }
         
-        self.selectedIndex = Tab.sources.rawValue
+        self.select(.sources)
     }
 }
 
@@ -135,41 +186,42 @@ private extension TabBarController
 {
     @objc func openPatreonSettings(_ notification: Notification)
     {
-        self.selectedIndex = Tab.settings.rawValue
+        self.select(.settings)
     }
     
     @objc func importApp(_ notification: Notification)
     {
-        self.selectedIndex = Tab.myApps.rawValue
+        self.select(.myApps)
     }
     
     @objc func openErrorLog(_ notification: Notification)
     {
-        self.selectedIndex = Tab.settings.rawValue
+        self.select(.settings)
     }
     
     @objc func openBrowseTab(_ notification: Notification)
     {
-        self.selectedIndex = Tab.browse.rawValue
+        self.select(.sources)
         
         if let query = notification.userInfo?[AppDelegate.searchDeepLinkQueryKey] as? String
         {
-            self.featuredViewController.loadViewIfNeeded()
-            self.featuredViewController.searchController.searchBar.text = query
+            self.sourcesViewController.loadViewIfNeeded()
+            self.sourcesViewController.navigationController?.popToRootViewController(animated: false)
             
-            self.featuredViewController.navigationController?.popToRootViewController(animated: false)
+            guard let searchController = self.sourcesViewController.navigationItem.searchController else { return }
+            searchController.searchBar.text = query
             
             // Slight delay to ensure the search controller is actually presented (YOLO).
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.featuredViewController.searchController.isActive = true
-                self.featuredViewController.searchController.updateSearchResults(for: self.featuredViewController.searchController)
+                searchController.isActive = true
+                searchController.searchResultsUpdater?.updateSearchResults(for: searchController)
             }
         }
     }
     
     @objc func viewApp(_ notification: Notification)
     {
-        self.selectedIndex = Tab.browse.rawValue
+        self.select(.sources)
         
         if let presentedViewController = self.presentedViewController
         {
@@ -183,11 +235,11 @@ private extension TabBarController
         guard let storeApp = notification.userInfo?[AppDelegate.viewAppDeepLinkStoreAppKey] as? StoreApp else { return }
         
         let appViewController = AppViewController.makeAppViewController(app: storeApp)
-        self.featuredViewController.navigationController?.pushViewController(appViewController, animated: true)
+        self.sourcesViewController.navigationController?.pushViewController(appViewController, animated: true)
     }
     
     @objc func exportCertificate(_ notification: Notification)
     {
-        self.selectedIndex = Tab.settings.rawValue
+        self.select(.settings)
     }
 }

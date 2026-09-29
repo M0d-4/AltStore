@@ -223,7 +223,7 @@ struct OperationError: ALTLocalizedError
         {
         case .serverNotFound: return NSLocalizedString("Make sure you're on the same Wi-Fi network as a computer running AltServer, or try connecting this device to your computer via USB.", comment: "")
         case .vpnNotConnected: return NSLocalizedString("Make sure Wi-Fi and LocalDevVPN are both connected, then try again.", comment: "")
-        case .missingPairingFile: return NSLocalizedString("Set up a remote AltServer in AltStore’s settings, then try again.", comment: "")
+        case .missingPairingFile: return NSLocalizedString("Add a pairing file in AltStore’s settings (or place one with iloader), then try again.", comment: "")
         case .invalidPairingFile: return NSLocalizedString("Try pairing this device again.", comment: "")
         case .wiredConnectionRequired: return NSLocalizedString("Connect your device to a computer running AltServer via USB, then try again.", comment: "")
         case .maximumAppIDLimitReached:

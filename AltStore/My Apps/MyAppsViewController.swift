@@ -39,6 +39,7 @@ class MyAppsViewController: UICollectionViewController, PeekPopPreviewing
     private lazy var dataSource = self.makeDataSource()
     private lazy var noUpdatesDataSource = self.makeNoUpdatesDataSource()
     private lazy var updatesDataSource = self.makeUpdatesDataSource()
+    var updatesDataSourceForIgnoring: RSTFetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage> { self.updatesDataSource }
     private lazy var activeAppsDataSource = self.makeActiveAppsDataSource()
     private lazy var inactiveAppsDataSource = self.makeInactiveAppsDataSource()
     private lazy var unsupportedUpdates = Set<StoreApp>()
@@ -68,6 +69,7 @@ class MyAppsViewController: UICollectionViewController, PeekPopPreviewing
         
         NotificationCenter.default.addObserver(self, selector: #selector(MyAppsViewController.didFetchSource(_:)), name: AppManager.didFetchSourceNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(MyAppsViewController.importApp(_:)), name: AppDelegate.importAppDeepLinkNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(MyAppsViewController.ignoredUpdatesDidChange(_:)), name: IgnoredUpdatesManager.didChangeNotification, object: nil)
     }
     
     override func viewDidLoad()
@@ -93,6 +95,12 @@ class MyAppsViewController: UICollectionViewController, PeekPopPreviewing
         self.collectionView.register(InstalledAppsCollectionHeaderView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "InactiveAppsHeader")
         self.collectionView.register(InstalledAppsCollectionFooterView.nib, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "InstalledAppsFooter")
         self.collectionView.register(InstalledAppsCollectionFooterView.nib, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "InstalledAppsFooter")
+        
+        // Use a compositional layout so the installed-apps grid has exact, even gaps and
+        // adapts its column count to the available width (1 column on iPhone, more on
+        // iPad). The storyboard's flow layout justified each row, which made the column
+        // gap wider than the row gap and stretched cells full-width on iPad.
+        self.collectionView.setCollectionViewLayout(self.makeLayout(), animated: false)
         
         let refreshControl = UIRefreshControl()
         refreshControl.addTarget(self, action: #selector(MyAppsViewController.checkForUpdates(_:)), for: .primaryActionTriggered)
@@ -212,6 +220,7 @@ private extension MyAppsViewController
     func makeUpdatesDataSource() -> RSTFetchedResultsCollectionViewPrefetchingDataSource<InstalledApp, UIImage>
     {
         let fetchRequest = InstalledApp.supportedUpdatesFetchRequest()
+        fetchRequest.predicate = Self.excludingIgnoredUpdates(fetchRequest.predicate)
         fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \InstalledApp.storeApp?.latestSupportedVersion?.date, ascending: false),
                                         NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)]
         fetchRequest.returnsObjectsAsFaults = false
@@ -579,19 +588,14 @@ private extension MyAppsViewController
     func updateBadgeCount()
     {
         let fetchRequest: NSFetchRequest<InstalledApp> = InstalledApp.supportedUpdatesFetchRequest()
+        fetchRequest.predicate = Self.excludingIgnoredUpdates(fetchRequest.predicate)
         
         do
         {
             let badgeCount = try DatabaseManager.shared.viewContext.count(for: fetchRequest)
             
-            if badgeCount > 0
-            {
-                self.navigationController?.tabBarItem.badgeValue = String(describing: badgeCount)
-            }
-            else
-            {
-                self.navigationController?.tabBarItem.badgeValue = nil
-            }
+            // The Updates tab shows the badge now, so don't duplicate it on My Apps.
+            self.navigationController?.tabBarItem.badgeValue = nil
             
             UNUserNotificationCenter.current().setBadgeCount(badgeCount) { error in
                 guard let error else { return }
@@ -1141,51 +1145,17 @@ private extension MyAppsViewController
     {
         guard !application.appExtensions.isEmpty else { return completion(.success(())) }
         
-        func removeAppExtensions() throws
-        {
-            for appExtension in application.appExtensions
+        Task<Void, Never> { @MainActor in
+            do
             {
-                try FileManager.default.removeItem(at: appExtension.fileURL)
+                try await AppExtensionsPrompt.present(for: application, from: self)
+                completion(.success(()))
             }
-            
-            let scInfoURL = application.fileURL.appendingPathComponent("SC_Info")
-            let manifestPlistURL = scInfoURL.appendingPathComponent("Manifest.plist")
-            
-            if let manifestPlist = NSMutableDictionary(contentsOf: manifestPlistURL),
-               let sinfReplicationPaths = manifestPlist["SinfReplicationPaths"] as? [String]
+            catch
             {
-                let replacementPaths = sinfReplicationPaths.filter { !$0.starts(with: "PlugIns/") } // Filter out app extension paths.
-                manifestPlist["SinfReplicationPaths"] = replacementPaths
-                try manifestPlist.write(to: manifestPlistURL)
+                completion(.failure(error))
             }
         }
-        
-        let firstSentence: String
-        
-        if UserDefaults.standard.activeAppLimitIncludesExtensions
-        {
-            firstSentence = NSLocalizedString("Non-developer Apple IDs are limited to 3 active apps and app extensions.", comment: "")
-        }
-        else
-        {
-            firstSentence = NSLocalizedString("Non-developer Apple IDs are limited to creating 10 App IDs per week.", comment: "")
-        }
-        
-        let message = firstSentence + " " + NSLocalizedString("Would you like to remove this app's extensions so they don't count towards your limit?", comment: "")
-        
-        let alertController = UIAlertController(title: NSLocalizedString("App Contains Extensions", comment: ""), message: message, preferredStyle: .alert)
-        alertController.addAction(UIAlertAction(title: UIAlertAction.cancel.title, style: UIAlertAction.cancel.style, handler: { (action) in
-            completion(.failure(OperationError.cancelled))
-        }))
-        alertController.addAction(UIAlertAction(title: NSLocalizedString("Keep App Extensions", comment: ""), style: .default) { (action) in
-            completion(.success(()))
-        })
-        alertController.addAction(UIAlertAction(title: NSLocalizedString("Remove App Extensions", comment: ""), style: .destructive) { (action) in
-            let result = Result { try removeAppExtensions() }
-            completion(result)
-        })
-        
-        self.present(alertController, animated: true, completion: nil)
     }
     
     @objc func showHiddenUpdatesAlert(_ sender: UIButton)
@@ -2054,13 +2024,23 @@ extension MyAppsViewController
         let section = Section(rawValue: indexPath.section)!
         switch section
         {
-        case .updates, .noUpdates: return nil
+        case .noUpdates: return nil
+        case .updates:
+            let installedApp = self.dataSource.item(at: indexPath)
+            
+            return UIContextMenuConfiguration(identifier: indexPath as NSIndexPath, previewProvider: nil) { (suggestedActions) -> UIMenu? in
+                return UIMenu(children: self.ignoreUpdateActions(for: installedApp))
+            }
         case .activeApps, .inactiveApps:
             let installedApp = self.dataSource.item(at: indexPath)
             
             return UIContextMenuConfiguration(identifier: indexPath as NSIndexPath, previewProvider: nil) { (suggestedActions) -> UIMenu? in
                 let menu = self.contextMenu(for: installedApp)
-                return menu
+                
+                // Apps that have an update available can have that update ignored, too.
+                let ignoreActions = self.ignoreUpdateActions(for: installedApp)
+                guard !ignoreActions.isEmpty else { return menu }
+                return menu.replacingChildren(menu.children + [UIMenu(options: .displayInline, children: ignoreActions)])
             }
         }
     }
@@ -2546,5 +2526,147 @@ extension MyAppsViewController: UIImagePickerControllerDelegate, UINavigationCon
     {
         picker.dismiss(animated: true, completion: nil)
         self._imagePickerInstalledApp = nil
+    }
+}
+
+extension MyAppsViewController
+{
+    static func excludingIgnoredUpdates(_ predicate: NSPredicate?) -> NSPredicate
+    {
+        let exclusion = IgnoredUpdatesManager.shared.excludingIgnoredPredicate()
+        guard let predicate else { return exclusion }
+        return NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, exclusion])
+    }
+    
+    /// Actions to ignore a single update, or to pick several updates to ignore at once.
+    func ignoreUpdateActions(for installedApp: InstalledApp) -> [UIMenuElement]
+    {
+        guard installedApp.storeApp?.latestSupportedVersion != nil, installedApp.isUpdateAvailable || IgnoredUpdatesManager.shared.isIgnored(installedApp) else { return [] }
+        
+        let isIgnored = IgnoredUpdatesManager.shared.isIgnored(installedApp)
+        
+        let toggleAction = UIAction(title: isIgnored ? NSLocalizedString("Stop Ignoring This Update", comment: "") : NSLocalizedString("Ignore This Update", comment: ""),
+                                    image: UIImage(systemName: isIgnored ? "bell" : "bell.slash")) { _ in
+            if isIgnored { IgnoredUpdatesManager.shared.unignore([installedApp]) } else { IgnoredUpdatesManager.shared.ignore([installedApp]) }
+        }
+        
+        let multipleAction = UIAction(title: NSLocalizedString("Ignore Updates for Multiple Apps…", comment: ""), image: UIImage(systemName: "checkmark.circle")) { [weak self] _ in
+            self?.presentIgnoreUpdatesPicker()
+        }
+        
+        return [toggleAction, multipleAction]
+    }
+    
+    func presentIgnoreUpdatesPicker()
+    {
+        let request = InstalledApp.supportedUpdatesFetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \InstalledApp.name, ascending: true)]
+        let apps = (try? DatabaseManager.shared.viewContext.fetch(request)) ?? []
+        guard !apps.isEmpty else { return }
+        
+        let pickerViewController = IgnoreUpdatesPickerViewController(apps: apps)
+        let navigationController = UINavigationController(rootViewController: pickerViewController)
+        self.present(navigationController, animated: true)
+    }
+    
+    @objc func ignoredUpdatesDidChange(_ notification: Notification)
+    {
+        let fetchedResultsController = self.updatesDataSourceForIgnoring.fetchedResultsController
+        fetchedResultsController.fetchRequest.predicate = Self.excludingIgnoredUpdates(InstalledApp.supportedUpdatesFetchRequest().predicate)
+        try? fetchedResultsController.performFetch()
+        
+        self.collectionView.reloadData()
+        self.collectionView.collectionViewLayout.invalidateLayout()
+        self.updateBadgeCount()
+    }
+}
+
+private extension MyAppsViewController
+{
+    static let gridSpacing: CGFloat = 10
+    
+    /// Compositional layout backing the installed-apps grid. Each row is divided into
+    /// N equal columns (N ≈ width / 350) with a fixed inter-item spacing that matches
+    /// the inter-group spacing, so the column and row gaps are always identical. The
+    /// updates section keeps its self-sizing cards, and the section headers/footers are
+    /// reproduced as boundary supplementary items (same reuse identifiers as before).
+    func makeLayout() -> UICollectionViewLayout
+    {
+        let spacing = MyAppsViewController.gridSpacing
+        let sectionInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 20, trailing: 0)
+        
+        return UICollectionViewCompositionalLayout { [weak self] sectionIndex, layoutEnvironment in
+            guard let self else { return nil }
+            
+            let section = Section.allCases[sectionIndex]
+            let width = layoutEnvironment.container.effectiveContentSize.width
+            
+            switch section
+            {
+            case .noUpdates:
+                let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(44))
+                let item = NSCollectionLayoutItem(layoutSize: size)
+                let group = NSCollectionLayoutGroup.vertical(layoutSize: size, subitems: [item])
+                let layoutSection = NSCollectionLayoutSection(group: group)
+                layoutSection.contentInsetsReference = .safeArea
+                return layoutSection
+                
+            case .updates:
+                // Update cards self-size via Auto Layout, so use an estimated height.
+                let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .estimated(156))
+                let item = NSCollectionLayoutItem(layoutSize: size)
+                let group = NSCollectionLayoutGroup.vertical(layoutSize: size, subitems: [item])
+                let layoutSection = NSCollectionLayoutSection(group: group)
+                layoutSection.interGroupSpacing = spacing
+                layoutSection.contentInsets = sectionInsets
+                layoutSection.contentInsetsReference = .safeArea
+                if (self.updatesDataSource.fetchedResultsController.fetchedObjects?.count ?? 0) > maximumCollapsedUpdatesCount
+                {
+                    layoutSection.boundarySupplementaryItems = [
+                        NSCollectionLayoutBoundarySupplementaryItem(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(26)), elementKind: UICollectionView.elementKindSectionHeader, alignment: .top)
+                    ]
+                }
+                return layoutSection
+                
+            case .activeApps, .inactiveApps:
+                let columns = max(1, Int(width / 350))
+                let item = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(88)))
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(88)), subitem: item, count: columns)
+                group.interItemSpacing = .fixed(spacing)
+                
+                let layoutSection = NSCollectionLayoutSection(group: group)
+                layoutSection.interGroupSpacing = spacing
+                layoutSection.contentInsets = sectionInsets
+                layoutSection.contentInsetsReference = .safeArea
+                
+                var supplementaries: [NSCollectionLayoutBoundarySupplementaryItem] = []
+                
+                // Header: active apps always show one; inactive apps only when populated
+                // (matches the old `referenceSizeForHeaderInSection`).
+                let showsHeader = (section == .activeApps) || self.inactiveAppsDataSource.itemCount > 0
+                if showsHeader
+                {
+                    supplementaries.append(NSCollectionLayoutBoundarySupplementaryItem(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(29)), elementKind: UICollectionView.elementKindSectionHeader, alignment: .top))
+                }
+                
+                // The App IDs footer sits under whichever section is last (active when
+                // there are no inactive apps, otherwise inactive) and only with a team.
+                let hasTeam = DatabaseManager.shared.activeTeam() != nil
+                let showsFooter: Bool
+                switch section
+                {
+                case .activeApps: showsFooter = hasTeam && self.inactiveAppsDataSource.itemCount == 0
+                case .inactiveApps: showsFooter = hasTeam && self.inactiveAppsDataSource.itemCount > 0
+                default: showsFooter = false
+                }
+                if showsFooter
+                {
+                    supplementaries.append(NSCollectionLayoutBoundarySupplementaryItem(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .estimated(80)), elementKind: UICollectionView.elementKindSectionFooter, alignment: .bottom))
+                }
+                
+                layoutSection.boundarySupplementaryItems = supplementaries
+                return layoutSection
+            }
+        }
     }
 }

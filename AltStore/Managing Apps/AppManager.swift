@@ -127,6 +127,7 @@ extension AppManager
     /// pairs afresh each time it installs AltStore, and the device only trusts its newest record.
     func adoptBundledPairingFileIfNeeded()
     {
+        guard !UserDefaults.shared.ignoresBundledPairingFile else { return } // User deleted the pairing file on purpose.
         guard let encryptedData = try? Data(contentsOf: Bundle.main.pairingFileURL) else { return }
 
         let hash = SHA256.hash(data: encryptedData).map { String(format: "%02x", $0) }.joined()
@@ -134,12 +135,14 @@ extension AppManager
 
         Keychain.shared.devicePairingFile = pairingFile
         UserDefaults.shared.adoptedBundledPairingFileHash = hash
+        UserDefaults.standard.set("bundled", forKey: "pairingFileSource")
 
         Logger.sideload.notice("Adopted the pairing file bundled by AltServer.")
     }
 
     func makeOnDeviceClient() throws -> OnDeviceClient
     {
+        PairingFileManager.shared.adoptDocumentsFileIfNeeded() // Pairing file placed by iloader takes priority.
         self.adoptBundledPairingFileIfNeeded()
         
         guard let pairingFile = Keychain.shared.devicePairingFile else { throw OperationError.missingPairingFile() }
@@ -1536,6 +1539,37 @@ private extension AppManager
         verifyOperation.addDependency(downloadOperation)
         
         
+        /* App Extensions (ask what to do with them) */
+        // Imported .ipa files (ALTApplication) already ask in MyAppsViewController, so only ask here for apps installed from a source.
+        var appExtensionsOperation: RSTAsyncBlockOperation?
+        if case .install = appOperation, !(app is ALTApplication)
+        {
+            let operation = RSTAsyncBlockOperation { operation in
+                if context.error != nil { return operation.finish() }
+                guard let application = context.app, !application.appExtensions.isEmpty else { return operation.finish() }
+                
+                DispatchQueue.main.async {
+                    guard let presenter = context.presentingViewController ?? context.authenticatedContext.presentingViewController else { return operation.finish() }
+                    
+                    Task<Void, Never> { @MainActor in
+                        do
+                        {
+                            try await AppExtensionsPrompt.present(for: application, from: presenter)
+                        }
+                        catch
+                        {
+                            context.error = error
+                        }
+                        operation.finish()
+                    }
+                }
+            }
+            operation.addDependency(downloadOperation)
+            verifyOperation.addDependency(operation) // Must finish before verifying, since verification caches the app.
+            appExtensionsOperation = operation
+        }
+        
+        
         /* Deactivate Apps (if necessary) */
         let deactivateAppsOperation = RSTAsyncBlockOperation { [weak self] (operation) in
             do
@@ -1733,7 +1767,7 @@ private extension AppManager
             progress.addChild(installOperation.progress, withPendingUnitCount: 50)
         }
 
-        var operations = [verifyPledgeOperation, downloadOperation, verifyOperation, deactivateAppsOperation, patchAppOperation, refreshAnisetteDataOperation, fetchProvisioningProfilesOperation, resignAppOperation, sendAppOperation, installOperation].compactMap { $0 }
+        var operations = [verifyPledgeOperation, downloadOperation, appExtensionsOperation, verifyOperation, deactivateAppsOperation, patchAppOperation, refreshAnisetteDataOperation, fetchProvisioningProfilesOperation, resignAppOperation, sendAppOperation, installOperation].compactMap { $0 }
         group.add(operations)
         
         if let storeApp = downloadingApp.storeApp, storeApp.isPledgeRequired

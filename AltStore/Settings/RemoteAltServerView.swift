@@ -39,7 +39,7 @@ struct RemoteAltServerView: View
     @Environment(\.dismiss)
     private var dismiss
 
-    private var localizedTitle: String { String(localized: "Remote AltServer") }
+    private var localizedTitle: String { String(localized: "Anisette Server") }
 
     var body: some View {
         List {
@@ -54,7 +54,7 @@ struct RemoteAltServerView: View
                     }
                 }
             } footer: {
-                Text(isConnected ? "The remote AltServer is ready to sideload apps." : "Turn on Wi-Fi and LocalDevVPN to connect.")
+                Text(isConnected ? "The pairing file is ready to sideload apps." : "Turn on Wi-Fi and LocalDevVPN to connect.")
             }
             .listSectionSpacing(10) // Visually differentiates sections of different types.
             
@@ -120,10 +120,10 @@ struct RemoteAltServerView: View
                 SwiftUI.Button(role: .destructive) {
                     isShowingClearConfirmation = true
                 } label: {
-                    Text("Reset Remote AltServer")
+                    Text("Delete Pairing File")
                         .frame(maxWidth: .infinity)
                 }
-                .confirmationDialog("Are you sure you want to reset Remote AltServer?", isPresented: $isShowingClearConfirmation, titleVisibility: .visible) {
+                .confirmationDialog("Are you sure you want to delete the pairing file?", isPresented: $isShowingClearConfirmation, titleVisibility: .visible) {
                     SwiftUI.Button("Reset", role: .destructive) {
                         clearRemoteAltServer()
                     }
@@ -238,9 +238,7 @@ private extension RemoteAltServerView
     
     func clearRemoteAltServer()
     {
-        UserDefaults.shared.prefersRemoteAltServer = false
-        UserDefaults.shared.ignoresBundledPairingFile = true
-        Keychain.shared.devicePairingFile = nil
+        PairingFileManager.shared.deletePairingFile()
         
         UserDefaults.shared.preferredAnisetteServerURL = nil
         Keychain.shared.anisetteADIPB = nil
