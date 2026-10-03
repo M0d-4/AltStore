@@ -50,4 +50,19 @@ class LicensesViewController: UIViewController
             self.textView.contentOffset.y = 0
         }
     }
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
+    {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        // On iPad, toggling between the tab bar and sidebar appearances (or Slide Over/Stage Manager
+        // resizing) changes this screen's width without a full view controller transition. The text
+        // view's TextKit layout doesn't always keep up within the same run loop pass, so for one frame
+        // it renders at its old (often much narrower) size before "popping" to the correct one. Forcing
+        // a layout pass inside the transition's animation block keeps the resize visually in sync.
+        coordinator.animate(alongsideTransition: { _ in
+            self.view.layoutIfNeeded()
+            self.textView.layoutIfNeeded()
+        })
+    }
 }

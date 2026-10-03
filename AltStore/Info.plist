@@ -115,6 +115,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_altserver._tcp</string>

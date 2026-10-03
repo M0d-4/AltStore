@@ -95,6 +95,12 @@ class AppOperationContext
     var app: ALTApplication?
     var provisioningProfiles: [String: ALTProvisioningProfile]?
     
+    /// When the user picks "Keep App Extensions (Use Main Profile)" in the app-extensions prompt,
+    /// every extension is resigned using the main app's own provisioning profile (nested under its
+    /// App ID) instead of registering a brand new App ID for each extension - see
+    /// FetchProvisioningProfilesOperation and ResignAppOperation.
+    var useMainProfile = false
+    
     var isFinished = false
     
     var error: Error? {

@@ -143,6 +143,18 @@ class MyAppsViewController: UICollectionViewController, PeekPopPreviewing
         _viewDidAppear = true
     }
     
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
+    {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        // Keep the grid in sync with the sidebar/tab-bar toggle and Slide Over/Stage Manager resizes,
+        // which change our width without a full rotation - animate the relayout so rows don't "pop".
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.view.layoutIfNeeded()
+        })
+    }
+    
     override func prepare(for segue: UIStoryboardSegue, sender: Any?)
     {
         guard let identifier = segue.identifier else { return }
@@ -2585,11 +2597,10 @@ private extension MyAppsViewController
 {
     static let gridSpacing: CGFloat = 10
     
-    /// Compositional layout backing the installed-apps grid. Each row is divided into
-    /// N equal columns (N ≈ width / 350) with a fixed inter-item spacing that matches
-    /// the inter-group spacing, so the column and row gaps are always identical. The
-    /// updates section keeps its self-sizing cards, and the section headers/footers are
-    /// reproduced as boundary supplementary items (same reuse identifiers as before).
+    /// Compositional layout backing the installed-apps list. Every app row spans the section's
+    /// full width (matching AppBannerView's fixed-height horizontal design) on iPhone and iPad
+    /// alike. The updates section keeps its self-sizing cards, and the section headers/footers
+    /// are reproduced as boundary supplementary items (same reuse identifiers as before).
     func makeLayout() -> UICollectionViewLayout
     {
         let spacing = MyAppsViewController.gridSpacing
@@ -2599,8 +2610,6 @@ private extension MyAppsViewController
             guard let self else { return nil }
             
             let section = Section.allCases[sectionIndex]
-            let width = layoutEnvironment.container.effectiveContentSize.width
-            
             switch section
             {
             case .noUpdates:
@@ -2629,10 +2638,11 @@ private extension MyAppsViewController
                 return layoutSection
                 
             case .activeApps, .inactiveApps:
-                let columns = max(1, Int(width / 350))
+                // AppBannerView is a fixed-height horizontal banner (icon left, name/button right) - it
+                // isn't designed to be squeezed into a multi-column grid cell, so every row always spans
+                // the section's full width, on iPhone and iPad alike.
                 let item = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(88)))
-                let group = NSCollectionLayoutGroup.horizontal(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(88)), subitem: item, count: columns)
-                group.interItemSpacing = .fixed(spacing)
+                let group = NSCollectionLayoutGroup.horizontal(layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(88)), subitems: [item])
                 
                 let layoutSection = NSCollectionLayoutSection(group: group)
                 layoutSection.interGroupSpacing = spacing

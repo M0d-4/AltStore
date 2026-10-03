@@ -124,7 +124,13 @@ class SourcesViewController: UICollectionViewController
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
     {
         super.viewWillTransition(to: size, with: coordinator)
-        self.collectionView.collectionViewLayout.invalidateLayout()
+        
+        // Keep the grid in sync with the sidebar/tab-bar toggle and Slide Over/Stage Manager resizes,
+        // which change our width without a full rotation - animate the relayout so rows don't "pop".
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.view.layoutIfNeeded()
+        })
     }
 }
 

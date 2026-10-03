@@ -330,8 +330,6 @@ extension AppManager
             return operation
         }
         
-        let prepareServerOperation = self.prepareServer(context: context)
-        
         let authenticationOperation = AuthenticationOperation(context: context, presentingViewController: presentingViewController)
         authenticationOperation.resultHandler = { (result) in
             switch result
@@ -342,7 +340,12 @@ extension AppManager
             
             completionHandler(result)
         }
-        authenticationOperation.addDependency(prepareServerOperation)
+        
+        if !UserDefaults.shared.prefersRemoteAltServer
+        {
+            let prepareServerOperation = self.prepareServer(context: context)
+            authenticationOperation.addDependency(prepareServerOperation)
+        }
 
         // Wait for a sign-in already in progress so this operation can reuse its session.
         self.authenticationLock.lock()
@@ -1554,7 +1557,7 @@ private extension AppManager
                     Task<Void, Never> { @MainActor in
                         do
                         {
-                            try await AppExtensionsPrompt.present(for: application, from: presenter)
+                            context.useMainProfile = try await AppExtensionsPrompt.present(for: application, from: presenter)
                         }
                         catch
                         {

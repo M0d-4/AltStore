@@ -74,16 +74,25 @@ private struct ComplicationView: View
     let style: Style
     
     var body: some View {
+        // With no apps at all (a fresh install, or the chosen app was uninstalled), refreshedDate ==
+        // expirationDate == .now, making totalDays 0 and progress a division-by-zero (NaN). A Gauge
+        // given NaN renders nothing at all rather than falling back to empty/full, so the complication
+        // silently disappeared on the actual Home/Lock Screen instead of showing any placeholder text.
         let refreshedDate = self.entry.apps.first?.refreshedDate ?? .now
         let expirationDate = self.entry.apps.first?.expirationDate ?? .now
         
         let totalDays = expirationDate.numberOfCalendarDays(since: refreshedDate)
         let daysRemaining = expirationDate.numberOfCalendarDays(since: self.entry.date)
         
-        let progress = Double(daysRemaining) / Double(totalDays)
+        let progress = totalDays != 0 ? (Double(daysRemaining) / Double(totalDays)) : (self.entry.apps.isEmpty ? 0 : (daysRemaining < 0 ? 1 : 0))
         
         Gauge(value: progress) {
-            if daysRemaining < 0
+            if self.entry.apps.isEmpty
+            {
+                Text("--")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+            }
+            else if daysRemaining < 0
             {
                 Text("Expired")
                     .font(.system(size: 10, weight: .bold))

@@ -15,24 +15,27 @@ enum AppExtensionsPrompt
     /// Asks what to do with the app's extensions, then removes the ones the user doesn't want.
     /// Throws `OperationError.cancelled` if the user cancels.
     @MainActor
-    static func present(for application: ALTApplication, from presenter: UIViewController) async throws
+    @discardableResult
+    static func present(for application: ALTApplication, from presenter: UIViewController) async throws -> Bool
     {
         let extensions = application.appExtensions
-        guard !extensions.isEmpty else { return }
+        guard !extensions.isEmpty else { return false }
 
         let decision = try await self.askForDecision(application: application, extensions: extensions, presenter: presenter)
 
         switch decision
         {
-        case .keepAll: break
+        case .keepAll(let useMainProfile): return useMainProfile
         case .removeAll: try self.remove(Array(extensions), from: application)
         case .removeSelected(let selection): try self.remove(Array(selection), from: application)
         }
+        
+        return false
     }
 
     private enum Decision
     {
-        case keepAll
+        case keepAll(useMainProfile: Bool)
         case removeAll
         case removeSelected(Set<ALTApplication>)
     }
@@ -63,8 +66,11 @@ enum AppExtensionsPrompt
             alertController.addAction(UIAlertAction(title: UIAlertAction.cancel.title, style: UIAlertAction.cancel.style) { _ in
                 continuation.resume(throwing: OperationError.cancelled)
             })
-            alertController.addAction(UIAlertAction(title: NSLocalizedString("Keep App Extensions", comment: ""), style: .default) { _ in
-                continuation.resume(returning: .keepAll)
+            alertController.addAction(UIAlertAction(title: NSLocalizedString("Keep App Extensions (Use Main Profile)", comment: ""), style: .default) { _ in
+                continuation.resume(returning: .keepAll(useMainProfile: true))
+            })
+            alertController.addAction(UIAlertAction(title: NSLocalizedString("Keep App Extensions (Register App ID for Each Extension)", comment: ""), style: .default) { _ in
+                continuation.resume(returning: .keepAll(useMainProfile: false))
             })
             alertController.addAction(UIAlertAction(title: NSLocalizedString("Remove App Extensions", comment: ""), style: .destructive) { _ in
                 continuation.resume(returning: .removeAll)

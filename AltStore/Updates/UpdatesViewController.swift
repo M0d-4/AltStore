@@ -47,9 +47,12 @@ final class UpdatesViewController: UICollectionViewController
 
     init()
     {
-        var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+        // Plain (not insetGrouped) so every row is a full-width, edge-to-edge bar - matching how the
+        // rest of the app presents full-width app rows - rather than a narrower, rounded inset card.
+        var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
         configuration.headerMode = .supplementary
         configuration.backgroundColor = .clear
+        configuration.showsSeparators = true
         super.init(collectionViewLayout: UICollectionViewCompositionalLayout.list(using: configuration))
     }
 
@@ -98,6 +101,16 @@ final class UpdatesViewController: UICollectionViewController
     {
         super.viewWillAppear(animated)
         self.reload()
+    }
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
+    {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.view.layoutIfNeeded()
+        })
     }
 
     @objc private func ignoredUpdatesDidChange()
@@ -257,7 +270,7 @@ final class UpdatesViewController: UICollectionViewController
         accessories.append(.customView(configuration: .init(customView: button, placement: .trailing(displayed: .whenNotEditing))))
 
         cell.accessories = accessories
-        cell.backgroundConfiguration = .listGroupedCell()
+        cell.backgroundConfiguration = .listPlainCell()
     }
 
     // MARK: - Actions

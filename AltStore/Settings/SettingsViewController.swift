@@ -50,8 +50,6 @@ extension SettingsViewController
     fileprivate enum CreditsRow: Int, CaseIterable
     {
         case developer
-        case operations
-        case designer
         case softwareLicenses
     }
     
@@ -216,6 +214,18 @@ class SettingsViewController: UITableViewController
         }
     }
     
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
+    {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        // Multi-line description rows (self-sizing cells) don't always recompute their height when the
+        // sidebar/tab-bar toggle or a Stage Manager resize changes our width without a full rotation -
+        // nudging the table with an empty update batch forces it to re-measure them in step.
+        coordinator.animate(alongsideTransition: { _ in
+            self.tableView.performBatchUpdates(nil)
+        })
+    }
+    
     override func viewWillAppear(_ animated: Bool)
     {
         super.viewWillAppear(animated)
@@ -303,11 +313,11 @@ private extension SettingsViewController
         case .patreon:
             if isHeader
             {
-                settingsHeaderFooterView.primaryLabel.text = NSLocalizedString("PATREON", comment: "")
+                settingsHeaderFooterView.primaryLabel.text = NSLocalizedString("KO-FI", comment: "")
             }
             else
             {
-                settingsHeaderFooterView.secondaryLabel.text = NSLocalizedString("Receive access to beta versions of AltStore, Delta, and more by becoming a patron.", comment: "")
+                settingsHeaderFooterView.secondaryLabel.text = NSLocalizedString("Enjoying AltStore? Consider supporting its continued development.", comment: "")
             }
             
         case .account:
@@ -740,6 +750,20 @@ private extension SettingsViewController
         let safariURL = URL(string: "https://github.com/altstoreio")!
         UIApplication.shared.open(safariURL, options: [:])
     }
+    
+    func openSafariURL(string: String)
+    {
+        guard let url = URL(string: string) else { return }
+        
+        if let selectedIndexPath = self.tableView.indexPathForSelectedRow
+        {
+            self.tableView.deselectRow(at: selectedIndexPath, animated: true)
+        }
+        
+        let safariViewController = SFSafariViewController(url: url)
+        safariViewController.preferredControlTintColor = .altPrimary
+        self.present(safariViewController, animated: true, completion: nil)
+    }
 }
 
 private extension SettingsViewController
@@ -750,8 +774,9 @@ private extension SettingsViewController
                 
         UIView.performWithoutAnimation {
             self.navigationController?.popViewController(animated: false)
-            self.performSegue(withIdentifier: "showPatreon", sender: nil)
         }
+        
+        self.openSafariURL(string: "https://ko-fi.com/mo0d4")
     }
     
     @objc func openErrorLog(_ notification: Notification)
@@ -973,6 +998,7 @@ extension SettingsViewController
         switch section
         {
         case .signIn: self.signIn()
+        case .patreon: self.openSafariURL(string: "https://ko-fi.com/mo0d4")
         case .appRefresh:
             let row = AppRefreshRow.allCases[indexPath.row]
             switch row
@@ -1017,9 +1043,7 @@ extension SettingsViewController
             let row = CreditsRow.allCases[indexPath.row]
             switch row
             {
-            case .developer: self.openMastodon(username: "@rileytestut@mastodon.social")
-            case .operations: self.openThreads(username: "shanegill.io")
-            case .designer: self.openTwitter(username: "1carolinemoore")
+            case .developer: self.openSafariURL(string: "https://github.com/M0d-4")
             case .softwareLicenses: break
             }
             

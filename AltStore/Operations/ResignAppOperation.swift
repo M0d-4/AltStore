@@ -115,7 +115,18 @@ private extension ResignAppOperation
             guard let profile = profiles[identifier] else { throw ALTError(.missingProvisioningProfile) }
             guard var infoDictionary = bundle.completeInfoDictionary else { throw ALTError(.missingInfoPlist) }
             
-            infoDictionary[kCFBundleIdentifierKey as String] = profile.bundleIdentifier
+            if self.context.useMainProfile, identifier != bundleIdentifier
+            {
+                // This is an app extension sharing the main app's profile (see FetchProvisioningProfilesOperation).
+                // Every extension still needs its own distinct identifier, so nest it under the main app's
+                // newly-resigned identifier the same way its original identifier was nested under the
+                // original app's, instead of collapsing every extension to the exact same identifier.
+                infoDictionary[kCFBundleIdentifierKey as String] = identifier.replacingOccurrences(of: bundleIdentifier, with: profile.bundleIdentifier)
+            }
+            else
+            {
+                infoDictionary[kCFBundleIdentifierKey as String] = profile.bundleIdentifier
+            }
             infoDictionary[Bundle.Info.altBundleID] = identifier
 
             for (key, value) in additionalInfoDictionaryValues

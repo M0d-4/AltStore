@@ -63,20 +63,36 @@ class FetchProvisioningProfilesOperation: ResultOperation<[String: ALTProvisioni
                 
                 let dispatchGroup = DispatchGroup()
                 
-                for appExtension in app.appExtensions
+                if self.context.useMainProfile
                 {
-                    dispatchGroup.enter()
-                    
-                    self.prepareProvisioningProfile(for: appExtension, parentApp: app, team: team, session: session) { (result) in
-                        switch result
-                        {
-                        case .failure(let e): error = e
-                        case .success(let profile): profiles[appExtension.bundleIdentifier] = profile
-                        }
-                        
-                        dispatchGroup.leave()
-                        
+                    // Skip registering a dedicated App ID for every extension (which counts against the
+                    // account's weekly App ID limit) and instead nest each extension under the main
+                    // app's own profile, the same way AppExtensionsPrompt/ResignAppOperation expect:
+                    // the extension keeps its own distinct identifier, just reparented under the main
+                    // app's registered App ID prefix rather than getting a brand new one.
+                    for appExtension in app.appExtensions
+                    {
+                        profiles[appExtension.bundleIdentifier] = profile
                         self.progress.completedUnitCount += 1
+                    }
+                }
+                else
+                {
+                    for appExtension in app.appExtensions
+                    {
+                        dispatchGroup.enter()
+                        
+                        self.prepareProvisioningProfile(for: appExtension, parentApp: app, team: team, session: session) { (result) in
+                            switch result
+                            {
+                            case .failure(let e): error = e
+                            case .success(let profile): profiles[appExtension.bundleIdentifier] = profile
+                            }
+                            
+                            dispatchGroup.leave()
+                            
+                            self.progress.completedUnitCount += 1
+                        }
                     }
                 }
                 

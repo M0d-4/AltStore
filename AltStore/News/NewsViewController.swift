@@ -55,6 +55,7 @@ class NewsViewController: UICollectionViewController, PeekPopPreviewing
     
     // Cache
     private var cachedCellSizes = [String: CGSize]()
+    private var cachedCellSizesWidth: CGFloat = 0
     private var cancellables = Set<AnyCancellable>()
     
     init?(source: Source?, coder: NSCoder)
@@ -76,6 +77,19 @@ class NewsViewController: UICollectionViewController, PeekPopPreviewing
     private func initialize()
     {
         NotificationCenter.default.addObserver(self, selector: #selector(NewsViewController.importApp(_:)), name: AppDelegate.importAppDeepLinkNotification, object: nil)
+    }
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator)
+    {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        // Our cell-size cache already self-corrects on width changes (see sizeForItemAt), but without
+        // this the layout doesn't recompute until the *next* scroll, producing a visible pop partway
+        // through the sidebar/tab-bar toggle or a Stage Manager resize.
+        coordinator.animate(alongsideTransition: { _ in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.view.layoutIfNeeded()
+        })
     }
     
     override func viewDidLoad()
@@ -442,6 +456,16 @@ extension NewsViewController: UICollectionViewDelegateFlowLayout
     {        
         let item = self.dataSource.item(at: indexPath)
         let globallyUniqueID = item.globallyUniqueID ?? item.identifier
+        
+        // Cell sizes are cached for performance, but the cache is only valid for the width it was
+        // computed at - iPad rotation, Stage Manager resizing, and toggling the sidebar all change
+        // the available width without recreating the cells, which otherwise left stale (often much
+        // narrower) cached sizes in place and made cards appear to "stick" to one side of the screen.
+        if collectionView.bounds.width != self.cachedCellSizesWidth
+        {
+            self.cachedCellSizes.removeAll()
+            self.cachedCellSizesWidth = collectionView.bounds.width
+        }
         
         if let previousSize = self.cachedCellSizes[globallyUniqueID]
         {
