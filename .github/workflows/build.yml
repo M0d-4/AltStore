@@ -44,7 +44,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
       CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
@@ -52,6 +52,7 @@ jobs:
       WORKSPACE: AltStore.xcworkspace
       DERIVED_DATA: ${{ github.workspace }}/DerivedData
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GIT_CONFIG_PARAMETERS: "'core.symlinks=false'"
 
     steps:
       - name: Checkout
