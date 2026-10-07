@@ -13,9 +13,8 @@ extension TabBarController
 {
     private enum Tab: Int, CaseIterable
     {
-        case news
         case sources
-        case updates   // Added in code; Browse was merged into Sources.
+        case updates   // Added in code; Browse was merged into Sources. (News was removed.)
         case myApps
         case settings
     }
@@ -71,6 +70,9 @@ class TabBarController: UITabBarController
             self.mode = .tabSidebar
             self.sidebar.isHidden = false
         }
+        
+        // My Apps is the default tab on launch.
+        self.select(.myApps)
     }
     
     /// Selects a tab. With the iPad sidebar active, tabs must be looked up by identity, not index.

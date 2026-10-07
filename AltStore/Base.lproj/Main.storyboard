@@ -36,7 +36,6 @@
                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.0" colorSpace="custom" customColorSpace="sRGB"/>
                     </tabBar>
                     <connections>
-                        <segue destination="kjR-gi-fgT" kind="relationship" relationship="viewControllers" id="eWy-uk-nwG"/>
                         <segue destination="bTL-bY-9Yq" kind="presentation" identifier="finishJailbreak" id="cIc-Ta-uNk"/>
                         <segue destination="HCK-G6-KdY" kind="relationship" relationship="viewControllers" id="X0t-T6-JeA"/>
                         <segue destination="3Ew-ox-i4n" kind="relationship" relationship="viewControllers" id="phQ-Pc-pqw"/>

@@ -75,22 +75,22 @@ struct AnisetteServerError: ALTLocalizedError
         case .unavailable:
             if let serverName = self.serverName
             {
-                return String(format: NSLocalizedString("The remote AltServer “%@” is currently unavailable.", comment: ""), serverName)
+                return String(format: NSLocalizedString("LocalDevVPN couldn’t reach “%@”. It is currently unavailable.", comment: ""), serverName)
             }
             else
             {
-                return NSLocalizedString("Your remote AltServer is currently unavailable.", comment: "")
+                return NSLocalizedString("LocalDevVPN is currently unavailable.", comment: "")
             }
             
-        case .invalidServer: return NSLocalizedString("The URL doesn’t point to a valid remote AltServer.", comment: "")
+        case .invalidServer: return NSLocalizedString("The URL doesn’t point to a valid server.", comment: "")
         case .invalidResponse:
             if let serverName = self.serverName
             {
-                return String(format: NSLocalizedString("The remote AltServer “%@” sent an invalid response.", comment: ""), serverName)
+                return String(format: NSLocalizedString("LocalDevVPN received an invalid response from “%@”.", comment: ""), serverName)
             }
             else
             {
-                return NSLocalizedString("Your remote AltServer sent an invalid response.", comment: "")
+                return NSLocalizedString("LocalDevVPN received an invalid response.", comment: "")
             }
         }
     }
@@ -99,7 +99,7 @@ struct AnisetteServerError: ALTLocalizedError
         switch self.code
         {
         case .unavailable, .invalidResponse: return NSLocalizedString("Try again in a few minutes, or choose a different server in AltStore’s settings.", comment: "")
-        case .invalidServer: return NSLocalizedString("Make sure the URL points to a valid remote AltServer and try again.", comment: "")
+        case .invalidServer: return NSLocalizedString("Make sure the URL points to a valid server and try again.", comment: "")
         }
     }
 }

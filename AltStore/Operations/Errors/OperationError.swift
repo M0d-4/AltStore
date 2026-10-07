@@ -197,7 +197,7 @@ struct OperationError: ALTLocalizedError
             return String(format: NSLocalizedString("Your pledge is no longer active. Please renew it to continue using %@ normally.", comment: ""), appName)
 
         case .vpnNotConnected:
-            return NSLocalizedString("AltStore couldn’t reach the remote AltServer.", comment: "")
+            return NSLocalizedString("AltStore couldn’t reach this device over LocalDevVPN.", comment: "")
 
         case .missingPairingFile:
             if #available(iOS 27, *)

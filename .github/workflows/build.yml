@@ -1,0 +1,190 @@
+name: Build AltStore
+
+# One workflow for every channel (modelled on SideStore's separate nightly/alpha
+# workflows). Pick the channel when running it manually; pushes and the daily
+# schedule use sensible defaults.
+#   nightly - rolling pre-release, rebuilt from `main` (also runs daily if there are new commits)
+#   alpha   - rolling pre-release, rebuilt from the branch you run it on (e.g. a staging branch)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitmodules"
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel"
+        required: true
+        default: nightly
+        type: choice
+        options:
+          - nightly
+          - alpha
+      configuration:
+        description: "Xcode build configuration"
+        required: true
+        default: Release
+        type: choice
+        options:
+          - Release
+          - Debug
+
+concurrency:
+  group: build-${{ github.event.inputs.channel || 'nightly' }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+      CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+      SCHEME: AltStore
+      WORKSPACE: AltStore.xcworkspace
+      DERIVED_DATA: ${{ github.workspace }}/DerivedData
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Skip scheduled builds with no new commits
+        id: gate
+        run: |
+          SKIP=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            LAST=$(gh release view nightly --json targetCommitish -q .targetCommitish 2>/dev/null || echo "")
+            if [ -n "$LAST" ] && [ "$LAST" = "$(git rev-parse HEAD)" ]; then SKIP=true; fi
+          fi
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
+      - name: Set version
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          SHORT=$(git rev-parse --short HEAD)
+          BASE=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" AltStore/Info.plist 2>/dev/null || echo "1.0")
+          case "$BASE" in *MARKETING_VERSION*|"") BASE="1.0" ;; esac
+          VERSION="${BASE}-${CHANNEL}.${{ github.run_number }}+${SHORT}"
+          echo "SHORT_COMMIT=$SHORT" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Select Xcode
+        if: steps.gate.outputs.skip != 'true'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache CocoaPods
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: Pods
+          key: pods-${{ hashFiles('Podfile.lock') }}
+          restore-keys: pods-
+
+      - name: Install dependencies
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          brew install ldid
+          gem install cocoapods --no-document
+          pod install --repo-update
+          xcodebuild -resolvePackageDependencies -workspace "$WORKSPACE" -scheme "$SCHEME"
+
+      - name: Build and package unsigned .ipa
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          set -eo pipefail
+
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ONLY_ACTIVE_ARCH=NO \
+            clean build \
+            | tee xcodebuild.log \
+            | (xcpretty --color || cat)
+
+          APP_PATH=$(find "$DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos" -maxdepth 1 -name "*.app" | head -n1)
+          [ -n "$APP_PATH" ] || { echo "No .app product found" >&2; exit 1; }
+
+          # CODE_SIGNING_ALLOWED=NO leaves the binaries with *no* entitlements at all, so the installed app
+          # has no app group: the widgets then read an empty, separate database (blank widgets), and
+          # AltStore's on-device installer also reports "App ID has no app groups". Re-apply each
+          # target's entitlements with ldid (a pseudo-sign), the same way SideStore's release does.
+          APP_BIN="$APP_PATH/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_PATH/Info.plist")"
+          ldid -SAltStore/AltStore.entitlements "$APP_BIN"
+
+          for APPEX in "$APP_PATH"/PlugIns/*.appex; do
+            [ -d "$APPEX" ] || continue
+            EXEC="$APPEX/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APPEX/Info.plist")"
+            case "$APPEX" in
+              *AltWidget*) ldid -SAltWidget/AltWidgetExtension.entitlements "$EXEC" ;;
+              *)           ldid -S "$EXEC" ;;
+            esac
+          done
+
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r -y "AltStore-${CHANNEL}.ipa" Payload
+          rm -rf Payload
+
+          if ls "$DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos"/*.dSYM >/dev/null 2>&1; then
+            (cd "$DERIVED_DATA/Build/Products/${CONFIGURATION}-iphoneos" && zip -r -q "$GITHUB_WORKSPACE/AltStore-${CHANNEL}-dSYMs.zip" *.dSYM)
+          fi
+
+      - name: Upload build log
+        if: always() && steps.gate.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ env.CHANNEL }}
+          path: xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload artifacts
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-${{ env.CHANNEL }}
+          path: |
+            AltStore-${{ env.CHANNEL }}.ipa
+            AltStore-${{ env.CHANNEL }}-dSYMs.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      # Rolling pre-release per channel (like SideStore's Nightly / Alpha releases).
+      - name: Publish release
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          TITLE="$(echo "${CHANNEL:0:1}" | tr a-z A-Z)${CHANNEL:1}"
+          NOTES="**${TITLE}** build \`${VERSION}\`
+          Commit: ${GITHUB_SHA}
+          Branch: ${GITHUB_REF_NAME}"
+
+          gh release delete "$CHANNEL" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$CHANNEL" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            "AltStore-${CHANNEL}.ipa" \
+            $( [ -f "AltStore-${CHANNEL}-dSYMs.zip" ] && echo "AltStore-${CHANNEL}-dSYMs.zip" )

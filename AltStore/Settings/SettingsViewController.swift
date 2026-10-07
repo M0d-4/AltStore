@@ -126,6 +126,9 @@ class SettingsViewController: UITableViewController
     {
         super.viewDidLoad()
         
+        // Don't let iPad's readable-content width squeeze/offset rows and headers differently.
+        self.tableView.cellLayoutMarginsFollowReadableWidth = false
+        
         let nib = UINib(nibName: "SettingsHeaderFooterView", bundle: nil)
         self.prototypeHeaderFooterView = nib.instantiate(withOwner: nil, options: nil)[0] as? SettingsHeaderFooterView
         

@@ -22,8 +22,15 @@ class SettingsHeaderFooterView: UITableViewHeaderFooterView
     {
         super.awakeFromNib()
         
-        self.contentView.layoutMargins = .zero
-        self.contentView.preservesSuperviewLayoutMargins = true
+        // Fixed, deterministic margins. Inheriting the table's margins (preservesSuperviewLayoutMargins)
+        // picked up the iPad *readable-width* inset on some layout passes but not others, so headers and
+        // footers drifted between x≈35, x≈365 (the readable inset) and even the far right. Pinning them
+        // keeps every section's text flush left, in line with the row text, at any width.
+        self.contentView.preservesSuperviewLayoutMargins = false
+        self.contentView.insetsLayoutMarginsFromSafeArea = false
+        self.contentView.layoutMargins = UIEdgeInsets(top: 0, left: 35, bottom: 0, right: 35)
+        self.primaryLabel.textAlignment = .left
+        self.secondaryLabel.textAlignment = .left
         
         self.stackView.translatesAutoresizingMaskIntoConstraints = false
         self.contentView.addSubview(self.stackView)

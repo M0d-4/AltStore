@@ -202,7 +202,7 @@ private extension RemoteAltServerSetupView
 // MARK: - Welcome
     
     var welcomeStep: some View {
-        HeroPage(title: "Remote AltServer",
+        HeroPage(title: "LocalDevVPN",
                  subtitle: "Use AltStore without a computer. Set up once, then sideload from anywhere.") {
             Image("LogoRecessed")
                 .resizable()
@@ -286,7 +286,7 @@ private extension RemoteAltServerSetupView
         }
         
         var body: some View {
-            StepPage(title: "Install LocalDevVPN", subtitle: "Remote AltServer requires LocalDevVPN to sideload apps.") {
+            StepPage(title: "Install LocalDevVPN", subtitle: "Sideloading on this device requires LocalDevVPN.") {
                 Image("LocalDevVPN")
                     .resizable()
                     .scaledToFit()
@@ -336,7 +336,7 @@ private extension RemoteAltServerSetupView
 // MARK: - Setup Complete
     
     var finishStep: some View {
-        HeroPage(title: "Setup Complete", subtitle: "Remote AltServer needs two things whenever you sideload:") {
+        HeroPage(title: "Setup Complete", subtitle: "LocalDevVPN needs two things whenever you sideload:") {
             Image("FinishGraphic")
                 .resizable()
                 .scaledToFit()
@@ -353,7 +353,7 @@ private extension RemoteAltServerSetupView
                         Text("Wi-Fi")
                             .font(.headline)
                         
-                        Text("Your device reaches AltServer over Wi-Fi, so keep it turned on.")
+                        Text("LocalDevVPN works over Wi-Fi, so keep both turned on.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

@@ -14,6 +14,12 @@ import Roxas
 
 import Nuke
 
+/// Fixed side margin for rows/headers. Cells used to copy `view.layoutMargins` when they were configured, but on
+/// iPad that value includes the sidebar's width while it is open - so rows kept a huge stale left margin (rendering
+/// narrow and shoved to the right) after the sidebar closed. The layout's own insets already handle safe areas and
+/// readable width, so a constant is both correct and stable.
+private let kContentMargin: CGFloat = 16
+
 private extension UIAction.Identifier
 {
     static let showDetails = UIAction.Identifier("io.altstore.showDetails")
@@ -404,8 +410,8 @@ private extension SourcesViewController
     {
         cell.layoutMargins.top = 5
         cell.layoutMargins.bottom = 5
-        cell.layoutMargins.left = self.view.layoutMargins.left
-        cell.layoutMargins.right = self.view.layoutMargins.right
+        cell.layoutMargins.left = kContentMargin
+        cell.layoutMargins.right = kContentMargin
         
         cell.bannerView.configure(for: source)
         
@@ -499,8 +505,8 @@ private extension SourcesViewController
     {
         cell.layoutMargins.top = 4
         cell.layoutMargins.bottom = 4
-        cell.layoutMargins.left = self.view.layoutMargins.left + 20 // Indent apps under their header.
-        cell.layoutMargins.right = self.view.layoutMargins.right
+        cell.layoutMargins.left = kContentMargin + 20 // Indent apps under their header.
+        cell.layoutMargins.right = kContentMargin
         
         cell.accessories = []
         

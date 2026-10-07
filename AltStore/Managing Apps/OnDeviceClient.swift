@@ -391,12 +391,16 @@ struct OnDeviceError: ALTLocalizedError
     }
     
     var errorFailureReason: String {
+        // Include what the device actually said (e.g. why the install was rejected) so it shows up in
+        // the exported log, not just in the in-app Error Log.
+        let detail = (self.ffiUnderlyingError?.userInfo[NSLocalizedDescriptionKey] as? String).map { " (\($0))" } ?? ""
+        
         switch self.code
         {
-        case .invalidPairingFile: return String(localized: "AltStore couldn’t read this device’s pairing info.")
-        case .pairingNotTrusted: return String(localized: "This device is no longer paired with AltStore.")
-        case .connectionFailed: return String(localized: "AltStore couldn’t connect to the remote AltServer.")
-        case .serviceFailed: return String(localized: "The remote AltServer couldn’t complete this operation.")
+        case .invalidPairingFile: return String(localized: "AltStore couldn’t read this device’s pairing info.") + detail
+        case .pairingNotTrusted: return String(localized: "This device is no longer paired with AltStore.") + detail
+        case .connectionFailed: return String(localized: "AltStore couldn’t connect to this device over LocalDevVPN.") + detail
+        case .serviceFailed: return String(localized: "LocalDevVPN couldn’t complete this operation.") + detail
         }
     }
     

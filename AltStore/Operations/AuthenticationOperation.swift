@@ -460,6 +460,11 @@ private extension AuthenticationOperation
                 case .failure(ALTAppleAPIError.incorrectCredentials), .failure(ALTAppleAPIError.appSpecificPasswordRequired):
                     authenticate()
                     
+                case .failure(ALTAppleAPIError.verificationCancelled):
+                    // Same outcome as before multi-method verification existed: callers treat a user
+                    // dismissing the verification prompt as "two-factor wasn't completed".
+                    completionHandler(.failure(ALTAppleAPIError(.requiresTwoFactorAuthentication)))
+                    
                 case .failure(let error):
                     completionHandler(.failure(error))
                 }
@@ -469,6 +474,137 @@ private extension AuthenticationOperation
         {
             authenticate()
         }
+    }
+    
+    // MARK: - Two-Factor Verification
+    
+    /// The view controller verification alerts should be presented from.
+    private func twoFactorPresenter(fallback presentingViewController: UIViewController) -> UIViewController
+    {
+        let base = (self.navigationController.presentingViewController != nil) ? self.navigationController : presentingViewController
+        
+        var top: UIViewController = base
+        while let presented = top.presentedViewController { top = presented }
+        return top
+    }
+    
+    private func presentTwoFactorPrompt(for request: TwoFactorRequest, presentingViewController: UIViewController, respond: @escaping (TwoFactorResponse) -> Void)
+    {
+        switch request.step
+        {
+        case .selectMethod:
+            self.presentTwoFactorMethodPicker(for: request, presentingViewController: presentingViewController, allowsBack: false, respond: respond, back: nil)
+            
+        case .enterCode:
+            self.presentTwoFactorCodeEntry(for: request, presentingViewController: presentingViewController, respond: respond)
+            
+        @unknown default:
+            respond(.cancel())
+        }
+    }
+    
+    /// Lets the user choose how to receive a verification code: trusted devices, a text message or a phone call.
+    private func presentTwoFactorMethodPicker(for request: TwoFactorRequest, presentingViewController: UIViewController, allowsBack: Bool,
+                                              respond: @escaping (TwoFactorResponse) -> Void, back: (() -> Void)?)
+    {
+        let message = request.errorMessage ?? NSLocalizedString("Choose how you'd like to receive your verification code.", comment: "")
+        let alertController = UIAlertController(title: NSLocalizedString("Verify Your Identity", comment: ""), message: message, preferredStyle: .alert)
+        
+        if request.supportsTrustedDevice
+        {
+            alertController.addAction(UIAlertAction(title: NSLocalizedString("Send Code to My Apple Devices", comment: ""), style: .default) { _ in
+                respond(.requestTrustedDevice())
+            })
+        }
+        
+        if request.phoneNumbers.isEmpty
+        {
+            // Apple didn't tell us which numbers are on the account, so it uses the primary one.
+            alertController.addAction(UIAlertAction(title: NSLocalizedString("Text Message", comment: ""), style: .default) { _ in
+                respond(.requestSMS(withPhoneID: nil))
+            })
+            alertController.addAction(UIAlertAction(title: NSLocalizedString("Phone Call", comment: ""), style: .default) { _ in
+                respond(.requestVoice(withPhoneID: nil))
+            })
+        }
+        else
+        {
+            for phoneNumber in request.phoneNumbers
+            {
+                alertController.addAction(UIAlertAction(title: String(format: NSLocalizedString("Text %@", comment: ""), phoneNumber.displayNumber), style: .default) { _ in
+                    respond(.requestSMS(withPhoneID: phoneNumber.identifier))
+                })
+                alertController.addAction(UIAlertAction(title: String(format: NSLocalizedString("Call %@", comment: ""), phoneNumber.displayNumber), style: .default) { _ in
+                    respond(.requestVoice(withPhoneID: phoneNumber.identifier))
+                })
+            }
+        }
+        
+        alertController.addAction(UIAlertAction(title: allowsBack ? NSLocalizedString("Back", comment: "") : RSTSystemLocalizedString("Cancel"), style: .cancel) { _ in
+            if allowsBack, let back { back() } else { respond(.cancel()) }
+        })
+        
+        self.twoFactorPresenter(fallback: presentingViewController).present(alertController, animated: true, completion: nil)
+    }
+    
+    private func presentTwoFactorCodeEntry(for request: TwoFactorRequest, presentingViewController: UIViewController, respond: @escaping (TwoFactorResponse) -> Void)
+    {
+        let title: String
+        switch request.activeMethod
+        {
+        case .trustedDevice:
+            title = NSLocalizedString("Please enter the 6-digit verification code that was sent to your Apple devices.", comment: "")
+            
+        case .sms, .voice:
+            let number = request.phoneNumbers.first(where: { $0.identifier == request.activePhoneID })?.displayNumber
+            
+            if request.activeMethod == .sms
+            {
+                title = number.map { String(format: NSLocalizedString("Please enter the 6-digit verification code that was texted to %@.", comment: ""), $0) }
+                    ?? NSLocalizedString("Please enter the 6-digit verification code that was sent by text message.", comment: "")
+            }
+            else
+            {
+                title = number.map { String(format: NSLocalizedString("Please enter the 6-digit verification code you'll receive by phone call to %@.", comment: ""), $0) }
+                    ?? NSLocalizedString("Please enter the 6-digit verification code you'll receive by phone call.", comment: "")
+            }
+            
+        @unknown default:
+            title = NSLocalizedString("Please enter the 6-digit verification code.", comment: "")
+        }
+        
+        let alertController = UIAlertController(title: title, message: request.errorMessage, preferredStyle: .alert)
+        alertController.addTextField { (textField) in
+            textField.autocorrectionType = .no
+            textField.autocapitalizationType = .none
+            textField.keyboardType = .numberPad
+            textField.textContentType = .oneTimeCode
+            
+            NotificationCenter.default.addObserver(self, selector: #selector(AuthenticationOperation.textFieldTextDidChange(_:)), name: UITextField.textDidChangeNotification, object: textField)
+        }
+        
+        let submitAction = UIAlertAction(title: NSLocalizedString("Continue", comment: ""), style: .default) { (action) in
+            let code = alertController.textFields?.first?.text ?? ""
+            respond(.submitCode(code))
+        }
+        submitAction.isEnabled = false
+        alertController.addAction(submitAction)
+        self.submitCodeAction = submitAction
+        
+        // Didn't get a code? Pick another delivery method (resend, switch to text/call, another number…).
+        alertController.addAction(UIAlertAction(title: NSLocalizedString("Didn't Get a Code?", comment: ""), style: .default) { [weak self] _ in
+            guard let self else { return respond(.cancel()) }
+            
+            self.presentTwoFactorMethodPicker(for: request, presentingViewController: presentingViewController, allowsBack: true, respond: respond, back: { [weak self] in
+                self?.presentTwoFactorCodeEntry(for: request, presentingViewController: presentingViewController, respond: respond)
+            })
+        })
+        
+        alertController.addAction(UIAlertAction(title: RSTSystemLocalizedString("Cancel"), style: .cancel) { (action) in
+            respond(.cancel())
+        })
+        
+        self.twoFactorPresenter(fallback: presentingViewController).present(alertController, animated: true, completion: nil)
     }
     
     func fetchAnisetteData(completionHandler: @escaping (Result<ALTAnisetteData, Swift.Error>) -> Void)
@@ -487,54 +623,25 @@ private extension AuthenticationOperation
             {
             case .failure(let error): completionHandler(.failure(error))
             case .success(let anisetteData):
-                let verificationHandler: ((@escaping (String?) -> Void) -> Void)?
+                let twoFactorHandler: TwoFactorHandler?
                 
                 if let presentingViewController = self.presentingViewController
                 {
-                    verificationHandler = { (completionHandler) in
+                    twoFactorHandler = { [weak self] (request, respond) in
                         DispatchQueue.main.async {
-                            let alertController = UIAlertController(title: NSLocalizedString("Please enter the 6-digit verification code that was sent to your Apple devices.", comment: ""), message: nil, preferredStyle: .alert)
-                            alertController.addTextField { (textField) in
-                                textField.autocorrectionType = .no
-                                textField.autocapitalizationType = .none
-                                textField.keyboardType = .numberPad
-                                
-                                NotificationCenter.default.addObserver(self, selector: #selector(AuthenticationOperation.textFieldTextDidChange(_:)), name: UITextField.textDidChangeNotification, object: textField)
-                            }
-                            
-                            let submitAction = UIAlertAction(title: NSLocalizedString("Continue", comment: ""), style: .default) { (action) in
-                                let textField = alertController.textFields?.first
-                                
-                                let code = textField?.text ?? ""
-                                completionHandler(code)
-                            }
-                            submitAction.isEnabled = false
-                            alertController.addAction(submitAction)
-                            self.submitCodeAction = submitAction
-                            
-                            alertController.addAction(UIAlertAction(title: RSTSystemLocalizedString("Cancel"), style: .cancel) { (action) in
-                                completionHandler(nil)
-                            })
-                            
-                            if self.navigationController.presentingViewController != nil
-                            {
-                                self.navigationController.present(alertController, animated: true, completion: nil)
-                            }
-                            else
-                            {
-                                presentingViewController.present(alertController, animated: true, completion: nil)
-                            }
+                            guard let self else { return respond(.cancel()) }
+                            self.presentTwoFactorPrompt(for: request, presentingViewController: presentingViewController, respond: respond)
                         }
                     }
                 }
                 else
                 {
-                    // No view controller to present security code alert, so don't provide verificationHandler.
-                    verificationHandler = nil
+                    // No view controller to present the verification prompts, so don't provide a handler.
+                    twoFactorHandler = nil
                 }
                     
                 ALTAppleAPI.shared.authenticate(appleID: appleID, password: password, anisetteData: anisetteData,
-                                                verificationHandler: verificationHandler) { (account, session, error) in
+                                                twoFactorHandler: twoFactorHandler) { (account, session, error) in
                     if let account = account, let session = session
                     {
                         completionHandler(.success((account, session)))

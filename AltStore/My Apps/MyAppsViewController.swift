@@ -18,6 +18,12 @@ import Roxas
 
 import Nuke
 
+/// Fixed side margin for rows/headers. Cells used to copy `view.layoutMargins` when they were configured, but on
+/// iPad that value includes the sidebar's width while it is open - so rows kept a huge stale left margin (rendering
+/// narrow and shoved to the right) after the sidebar closed. The layout's own insets already handle safe areas and
+/// readable width, so a constant is both correct and stable.
+private let kContentMargin: CGFloat = 16
+
 private let maximumCollapsedUpdatesCount = 2
 
 extension MyAppsViewController
@@ -205,8 +211,8 @@ private extension MyAppsViewController
         dynamicDataSource.cellIdentifierHandler = { _ in "NoUpdatesCell" }
         dynamicDataSource.cellConfigurationHandler = { (cell, _, indexPath) in
             let cell = cell as! NoUpdatesCollectionViewCell
-            cell.layoutMargins.left = self.view.layoutMargins.left
-            cell.layoutMargins.right = self.view.layoutMargins.right
+            cell.layoutMargins.left = kContentMargin
+            cell.layoutMargins.right = kContentMargin
             
             cell.blurView.layer.cornerRadius = 20
             cell.blurView.layer.masksToBounds = true
@@ -245,8 +251,8 @@ private extension MyAppsViewController
             guard let app = installedApp.storeApp, let latestSupportedVersion = app.latestSupportedVersion else { return }
             
             let cell = cell as! UpdateCollectionViewCell
-            cell.layoutMargins.left = self.view.layoutMargins.left
-            cell.layoutMargins.right = self.view.layoutMargins.right
+            cell.layoutMargins.left = kContentMargin
+            cell.layoutMargins.right = kContentMargin
             
             cell.tintColor = app.tintColor ?? .altPrimary
             cell.versionDescriptionTextView.text = latestSupportedVersion.localizedDescription
@@ -355,8 +361,8 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
-            cell.layoutMargins.left = self.view.layoutMargins.left
-            cell.layoutMargins.right = self.view.layoutMargins.right
+            cell.layoutMargins.left = kContentMargin
+            cell.layoutMargins.right = kContentMargin
             cell.tintColor = tintColor
             
             cell.deactivateBadge?.isHidden = false
@@ -490,8 +496,8 @@ private extension MyAppsViewController
             let tintColor = installedApp.storeApp?.tintColor ?? .altPrimary
             
             let cell = cell as! InstalledAppCollectionViewCell
-            cell.layoutMargins.left = self.view.layoutMargins.left
-            cell.layoutMargins.right = self.view.layoutMargins.right
+            cell.layoutMargins.left = kContentMargin
+            cell.layoutMargins.right = kContentMargin
             cell.tintColor = UIColor.gray
             
             cell.bannerView.iconImageView.isIndicatingActivity = true
@@ -1765,8 +1771,8 @@ extension MyAppsViewController
             let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "ActiveAppsHeader", for: indexPath) as! InstalledAppsCollectionHeaderView
             
             UIView.performWithoutAnimation {
-                headerView.layoutMargins.left = self.view.layoutMargins.left
-                headerView.layoutMargins.right = self.view.layoutMargins.right
+                headerView.layoutMargins.left = kContentMargin
+                headerView.layoutMargins.right = kContentMargin
                 
                 if UserDefaults.standard.activeAppsLimit == nil
                 {
@@ -1803,8 +1809,8 @@ extension MyAppsViewController
             let headerView = collectionView.dequeueReusableSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "InactiveAppsHeader", for: indexPath) as! InstalledAppsCollectionHeaderView
             
             UIView.performWithoutAnimation {
-                headerView.layoutMargins.left = self.view.layoutMargins.left
-                headerView.layoutMargins.right = self.view.layoutMargins.right
+                headerView.layoutMargins.left = kContentMargin
+                headerView.layoutMargins.right = kContentMargin
                 
                 headerView.textLabel.text = NSLocalizedString("Inactive", comment: "")
                 headerView.button.setTitle(nil, for: .normal)

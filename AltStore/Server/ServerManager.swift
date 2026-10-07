@@ -169,7 +169,7 @@ private extension ServerManager
         let serverName: String
         if let localizedName = server.localizedName
         {
-            serverName = String(format: NSLocalizedString("remote AltServer %@", comment: ""), localizedName)
+            serverName = String(format: NSLocalizedString("LocalDevVPN %@", comment: ""), localizedName)
         }
         else if server.connectionType == .wired
         {

@@ -175,7 +175,8 @@ extension ALTAppleAPIError.Code: CaseIterable
                 .invalidAppGroup, .appGroupDoesNotExist,
                 .invalidProvisioningProfileIdentifier, .provisioningProfileDoesNotExist,
                 .requiresTwoFactorAuthentication, .incorrectVerificationCode, .authenticationHandshakeFailed,
-                .invalidAnisetteData]
+                .invalidAnisetteData,
+                .tooManyVerificationAttempts, .verificationCancelled, .verificationFailed]
     }
 }
 

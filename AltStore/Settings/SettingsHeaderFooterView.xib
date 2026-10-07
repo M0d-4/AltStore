@@ -18,16 +18,16 @@
                 <stackView opaque="NO" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" axis="vertical" translatesAutoresizingMaskIntoConstraints="NO" id="lwu-4e-pWM">
                     <rect key="frame" x="30" y="8" width="137.5" height="46"/>
                     <subviews>
-                        <stackView opaque="NO" contentMode="scaleToFill" distribution="equalSpacing" translatesAutoresizingMaskIntoConstraints="NO" id="kEr-mf-Jw4">
+                        <stackView opaque="NO" contentMode="scaleToFill" distribution="fill" translatesAutoresizingMaskIntoConstraints="NO" id="kEr-mf-Jw4">
                             <rect key="frame" x="0.0" y="0.0" width="137.5" height="29"/>
                             <subviews>
-                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" verticalCompressionResistancePriority="1000" text="ACCOUNT" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="rLj-Ff-ZTt">
+                                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="1" verticalHuggingPriority="251" verticalCompressionResistancePriority="1000" text="ACCOUNT" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="rLj-Ff-ZTt">
                                     <rect key="frame" x="0.0" y="0.0" width="68.5" height="29"/>
                                     <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                     <color key="textColor" white="1" alpha="0.75" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                     <nil key="highlightedColor"/>
                                 </label>
-                                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="meg-d6-dbz">
+                                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" horizontalHuggingPriority="1000" horizontalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="meg-d6-dbz">
                                     <rect key="frame" x="68.5" y="0.0" width="69" height="29"/>
                                     <fontDescription key="fontDescription" type="boldSystem" pointSize="14"/>
                                     <state key="normal" title="SIGN OUT">
